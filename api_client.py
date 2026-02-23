@@ -1,13 +1,10 @@
 """Freshworks CRM API client."""
 
-import time
 import os
 import requests
 
 BASE_URL = "https://sundirect-606378453475310199.myfreshworks.com"
 OWNER_ID = 403000001694
-REQUEST_DELAY = 0.5
-
 
 class FreshworksClient:
     def __init__(self, cookie, csrf_token):
@@ -20,7 +17,6 @@ class FreshworksClient:
         })
 
     def _request(self, method, path, **kwargs):
-        time.sleep(REQUEST_DELAY)
         resp = self.session.request(method, f"{BASE_URL}{path}", **kwargs)
         if resp.status_code == 401 or "login" in resp.text.lower()[:100]:
             raise Exception("Session expired — grab fresh Cookie and X-CSRF-Token from browser")

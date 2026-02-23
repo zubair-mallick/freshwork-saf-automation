@@ -1,20 +1,7 @@
 """Core logic — process each person through the 4-step workflow."""
 
 import os
-import time
-import sys
-from logger import log, Logger
-
-COOLDOWN = 10  # seconds between each account cycle to mimic human pace
-
-
-def human_delay():
-    for i in range(COOLDOWN, 0, -1):
-        sys.stdout.write(f"\r    Waiting {i}s before next...")
-        sys.stdout.flush()
-        time.sleep(1)
-    sys.stdout.write("\r" + " " * 40 + "\r")
-    sys.stdout.flush()
+from logger import log, Logger, _write, LOG_FILE
 
 
 def names_match(search_name, result_name):
@@ -30,7 +17,7 @@ def process_person(client, name, image_path, index, total):
         data = client.search(name)
     except Exception as e:
         log.error(f"Search failed: {e}")
-        return {"name": name, "status": "FAILED", "reason": str(e)}
+        return {"name": name, "status": "NO_MATCH", "reason": str(e)}
 
     results = data.get("search_response", [])
     cm_accounts = [r for r in results if r.get("type") == "cm_accounts"]
@@ -39,8 +26,8 @@ def process_person(client, name, image_path, index, total):
     log.info(f"Results: {len(results)} total, {len(cm_accounts)} cm_accounts, {len(matched)} name-matched")
 
     if not matched:
-        log.warn("No matching accounts — skipping")
-        return {"name": name, "status": "SKIPPED", "reason": "No matching cm_accounts"}
+        log.warn("No matching accounts found")
+        return {"name": name, "status": "NO_MATCH", "reason": "No matching cm_accounts"}
 
     # Step 2/3/4 for each matched account
     account_results = []
@@ -96,21 +83,29 @@ def process_person(client, name, image_path, index, total):
             log.error(f"Update failed (image uploaded as doc {doc_id}): {e}")
             account_results.append({"id": acc_id, "status": "PARTIAL", "reason": str(e), "doc_id": doc_id})
 
-        # Cooldown between accounts
-        if acc != matched[-1]:
-            human_delay()
-
     succeeded = sum(1 for r in account_results if r["status"] == "SUCCESS")
     return {"name": name, "status": "DONE", "succeeded": succeeded, "details": account_results}
 
 
 def print_summary(summary):
-    log.header("SUMMARY")
-    total_s = total_sk = total_f = 0
+    log.header("RESULTS — Per Person")
 
-    for r in summary:
+    total_s = total_sk = total_no = total_f = 0
+    G, R, Y, X, B, D = Logger.G, Logger.R, Logger.Y, Logger.X, Logger.B, Logger.D
+
+    for i, r in enumerate(summary):
+        idx = f"[{i+1}/{len(summary)}]"
         name = r["name"]
-        if r["status"] == "DONE":
+
+        if r["status"] == "NO_MATCH":
+            total_no += 1
+            _write(f"  {R}{idx}{X} {B}{name}{X} — {R}No Matching Accounts{X}")
+
+        elif r["status"] == "FAILED":
+            total_f += 1
+            _write(f"  {R}{idx}{X} {B}{name}{X} — {R}FAILED: {r.get('reason','')}{X}")
+
+        elif r["status"] == "DONE":
             details = r.get("details", [])
             s = sum(1 for d in details if d["status"] == "SUCCESS")
             sk = sum(1 for d in details if d["status"] == "SKIPPED")
@@ -118,18 +113,33 @@ def print_summary(summary):
             total_s += s
             total_sk += sk
             total_f += f
-            log.line(f"{Logger.B}{name}{Logger.X}: {s} uploaded, {sk} skipped, {f} failed")
-            for d in details:
-                color = Logger.G if d["status"] == "SUCCESS" else Logger.Y if d["status"] == "SKIPPED" else Logger.R
-                extra = f" (doc:{d['doc_id']})" if d.get("doc_id") else f" ({d.get('reason','')})"
-                log.line(f"    {color}{d['status']}{Logger.X} Account {d['id']}{extra}")
-        elif r["status"] == "SKIPPED":
-            total_sk += 1
-            log.line(f"{Logger.Y}{name}{Logger.X}: SKIPPED — {r.get('reason','')}")
-        else:
-            total_f += 1
-            log.line(f"{Logger.R}{name}{Logger.X}: FAILED — {r.get('reason','')}")
 
-    print(f"\n{'─'*70}")
-    print(f"  Total: {Logger.G}{total_s} uploaded{Logger.X} | {Logger.Y}{total_sk} skipped{Logger.X} | {Logger.R}{total_f} failed{Logger.X}")
-    print(f"{'─'*70}\n")
+            if s > 0 and f == 0:
+                _write(f"  {G}{idx}{X} {B}{name}{X} — {G}{s} uploaded{X}, {sk} skipped")
+            elif s > 0 and f > 0:
+                _write(f"  {Y}{idx}{X} {B}{name}{X} — {G}{s} uploaded{X}, {R}{f} failed{X}, {sk} skipped")
+            elif s == 0 and sk > 0:
+                _write(f"  {Y}{idx}{X} {B}{name}{X} — {Y}All {sk} skipped{X}")
+            else:
+                _write(f"  {R}{idx}{X} {B}{name}{X} — {R}{f} failed{X}")
+
+            for d in details:
+                if d["status"] == "SUCCESS":
+                    _write(f"      {G}SUCCESS{X} Account {d['id']} (doc:{d['doc_id']})")
+                elif d["status"] == "SKIPPED":
+                    _write(f"      {Y}SKIPPED{X} Account {d['id']} ({d.get('reason','')})")
+                else:
+                    _write(f"      {R}{d['status']}{X} Account {d['id']} ({d.get('reason','')})")
+
+    # Final counts
+    _write(f"\n{'='*70}")
+    _write(f"  {B}FINAL COUNTS{X}")
+    _write(f"{'='*70}")
+    _write(f"  Total people processed : {len(summary)}")
+    _write(f"  {G}Accounts uploaded       : {total_s}{X}")
+    _write(f"  {Y}Accounts skipped        : {total_sk}{X}")
+    _write(f"  {R}No matching accounts    : {total_no}{X}")
+    _write(f"  {R}Failed                  : {total_f}{X}")
+    _write(f"{'='*70}")
+    _write(f"  Log saved to: {LOG_FILE}")
+    _write(f"{'='*70}\n")

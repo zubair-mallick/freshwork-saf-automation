@@ -12,7 +12,7 @@ import sys
 from logger import log
 from api_client import FreshworksClient
 from pdf_converter import convert_pdf_to_images
-from processor import process_person, print_summary, human_delay
+from processor import process_person, print_summary
 
 WORK_DIR = os.path.dirname(os.path.abspath(__file__))
 PDF_PATH = os.path.join(WORK_DIR, "Aadhar.pdf")
@@ -61,8 +61,6 @@ def main():
     for i, (name, img) in enumerate(zip(names, image_paths)):
         result = process_person(client, name, img, i + 1, len(names))
         summary.append(result)
-        if i < len(names) - 1:
-            human_delay()
 
     print_summary(summary)
 

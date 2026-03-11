@@ -8,6 +8,9 @@ OWNER_ID = 403000001694
 
 class FreshworksClient:
     def __init__(self, cookie, csrf_token):
+        # Remove ellipsis character that may appear in truncated cookie strings
+        cookie = cookie.replace("…", "")
+        
         self.session = requests.Session()
         self.session.headers.update({
             "Accept": "application/json",

@@ -13,6 +13,45 @@ This script:
 - Python `3.10+`
 - Access to Freshworks CRM in browser
 
+## Install Python
+
+### Windows
+
+1. Download Python from `https://www.python.org/downloads/windows/`
+2. Run installer and enable `Add python.exe to PATH`
+3. Click `Install Now`
+4. Verify:
+
+```bash
+python --version
+pip --version
+```
+
+If `python` is not recognized, restart terminal and try:
+
+```bash
+py --version
+```
+
+### macOS
+
+Install with Homebrew:
+
+```bash
+brew install python
+python3 --version
+pip3 --version
+```
+
+### Ubuntu/Debian
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-pip
+python3 --version
+pip3 --version
+```
+
 ## Project Files
 
 Keep these files in the project root (same folder as `main.py`):
@@ -33,6 +72,12 @@ From project root:
 
 ```bash
 python -m pip install -r requirements.txt
+```
+
+If your system uses `python3`, use:
+
+```bash
+python3 -m pip install -r requirements.txt
 ```
 
 ## Input Rules
